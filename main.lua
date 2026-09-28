@@ -11,6 +11,9 @@ local blockKnockbackScale = 0.25
 local roundDuration = 60
 local roundEndDelay = 2
 local roundsToWin = 2
+local hitStopDuration = 0.06
+local hitFlashDuration = 0.12
+local comboTimeout = 1.5
 local fighter1StartX = 260
 local fighter2StartX = 700
 local cpuEnabled = true
@@ -20,9 +23,9 @@ local timerFont = love.graphics.newFont(28)
 local resultFont = love.graphics.newFont(38)
 
 local attacks = {
-    punch = { duration = 0.18, recovery = 0.28, range = 58, height = 26,
+    punch = { startup = 0.07, active = 0.10, recovery = 0.29, range = 58, height = 26,
         damage = 24, knockback = 22, yOffset = 48 },
-    kick = { duration = 0.25, recovery = 0.34, range = 82, height = 24,
+    kick = { startup = 0.11, active = 0.14, recovery = 0.36, range = 82, height = 24,
         damage = 34, knockback = 30, yOffset = 30 },
 }
 
@@ -72,6 +75,9 @@ function Fighter.new(x, color, controls)
         crouching = false,
         attack = nil,
         recovery = 0,
+        hitFlash = 0,
+        combo = 0,
+        comboTimer = 0,
         ko = false,
     }, Fighter)
 end
@@ -88,6 +94,9 @@ function Fighter:reset()
     self.crouching = false
     self.attack = nil
     self.recovery = 0
+    self.hitFlash = 0
+    self.combo = 0
+    self.comboTimer = 0
     self.ko = false
 end
 
@@ -136,13 +145,19 @@ function Fighter:startAttack(kind)
     local settings = attacks[kind]
     self.attack = {
         kind = kind,
-        timer = settings.duration,
+        phase = "startup",
+        timer = settings.startup,
         hitOpponent = false,
         hitbox = { x = 0, y = 0, width = settings.range, height = settings.height },
     }
 end
 
 function Fighter:update(dt)
+    self.hitFlash = math.max(0, self.hitFlash - dt)
+    self.comboTimer = math.max(0, self.comboTimer - dt)
+    if self.comboTimer == 0 then
+        self.combo = 0
+    end
     if self.ko then
         self.state = "ko"
         return
@@ -205,6 +220,7 @@ local fighters = { fighter1, fighter2 }
 local game = {
     state = "fighting",
     timeRemaining = roundDuration,
+    hitStopTimer = 0,
     round = 1,
     score1 = 0,
     score2 = 0,
@@ -215,6 +231,7 @@ local game = {
 local function resetRound()
     fighter1:reset()
     fighter2:reset()
+    game.hitStopTimer = 0
     fighter2.aiInput = nil
     cpu.decisionTimer = 0.35
     cpu.attackCooldown = 0
@@ -250,6 +267,7 @@ local function finishRound(winner)
 
     fighter1.attack = nil
     fighter2.attack = nil
+    game.hitStopTimer = 0
     fighter1.blocking = false
     fighter2.blocking = false
     fighter1.state = fighter1.ko and "ko" or "idle"
@@ -258,6 +276,10 @@ local function finishRound(winner)
     if (winner == 1 and game.score1 >= roundsToWin)
         or (winner == 2 and game.score2 >= roundsToWin) then
         game.result = "FIGHTER " .. winner .. " WINS THE MATCH"
+        fighter1.combo = 0
+        fighter1.comboTimer = 0
+        fighter2.combo = 0
+        fighter2.comboTimer = 0
         game.state = "match_over"
     else
         game.state = "round_over"
@@ -277,32 +299,50 @@ local function updateAttack(attacker, defender, dt)
     end
 
     local settings = attacks[attack.kind]
-    local hitbox = attack.hitbox
-    hitbox.y = attacker.y - settings.yOffset
-    if attacker.facing > 0 then
-        hitbox.x = attacker.x + fighterWidth / 2 + 2
-    else
-        hitbox.x = attacker.x - fighterWidth / 2 - 2 - hitbox.width
-    end
-
-    if not attack.hitOpponent and not defender.ko then
-        local defenderHeight = defender.crouching and crouchingHeight or standingHeight
-        local defenderBox = {
-            x = defender.x - fighterWidth / 2,
-            y = defender.y - defenderHeight,
-            width = fighterWidth,
-            height = defenderHeight,
-        }
-        if overlaps(hitbox, defenderBox) then
-            attack.hitOpponent = true
-            defender:takeDamage(settings.damage, settings.knockback, attacker)
+    attack.timer = attack.timer - dt
+    if attack.timer <= 0 then
+        if attack.phase == "startup" then
+            attack.phase = "active"
+            attack.timer = settings.active
+        else
+            attacker.attack = nil
+            attacker.recovery = settings.recovery
+            if not attack.hitOpponent then
+                attacker.combo = 0
+                attacker.comboTimer = 0
+            end
+            return
         end
     end
 
-    attack.timer = attack.timer - dt
-    if attack.timer <= 0 then
-        attacker.attack = nil
-        attacker.recovery = settings.recovery
+    if attack.phase == "active" then
+        local hitbox = attack.hitbox
+        hitbox.y = attacker.y - settings.yOffset
+        if attacker.facing > 0 then
+            hitbox.x = attacker.x + fighterWidth / 2 + 2
+        else
+            hitbox.x = attacker.x - fighterWidth / 2 - 2 - hitbox.width
+        end
+
+        if not attack.hitOpponent and not defender.ko then
+            local defenderHeight = defender.crouching and crouchingHeight or standingHeight
+            local defenderBox = {
+                x = defender.x - fighterWidth / 2,
+                y = defender.y - defenderHeight,
+                width = fighterWidth,
+                height = defenderHeight,
+            }
+            if overlaps(hitbox, defenderBox) then
+                attack.hitOpponent = true
+                defender:takeDamage(settings.damage, settings.knockback, attacker)
+                attacker.combo = attacker.combo + 1
+                attacker.comboTimer = comboTimeout
+                defender.combo = 0
+                defender.comboTimer = 0
+                defender.hitFlash = hitFlashDuration
+                game.hitStopTimer = hitStopDuration
+            end
+        end
     end
 end
 
@@ -378,7 +418,7 @@ function love.keypressed(key, scancode, isrepeat)
         love.event.quit()
         return
     end
-    if isrepeat or game.state ~= "fighting" then
+    if isrepeat or game.state ~= "fighting" or game.hitStopTimer > 0 then
         return
     end
 
@@ -397,13 +437,22 @@ end
 
 function love.update(dt)
     if game.state == "round_over" then
+        fighter1.hitFlash = math.max(0, fighter1.hitFlash - dt)
+        fighter2.hitFlash = math.max(0, fighter2.hitFlash - dt)
         game.transitionTimer = game.transitionTimer - dt
         if game.transitionTimer <= 0 then
             game.round = game.round + 1
             resetRound()
         end
         return
-    elseif game.state == "match_over" then
+    elseif game.state ~= "fighting" then
+        fighter1.hitFlash = math.max(0, fighter1.hitFlash - dt)
+        fighter2.hitFlash = math.max(0, fighter2.hitFlash - dt)
+        return
+    end
+
+    if game.hitStopTimer > 0 then
+        game.hitStopTimer = math.max(0, game.hitStopTimer - dt)
         return
     end
 
@@ -452,10 +501,32 @@ end
 local function drawFighter(fighter)
     local bodyHeight = fighter.crouching and crouchingHeight or standingHeight
     local bodyTop = fighter.y - bodyHeight
-    love.graphics.setColor(fighter.color[1], fighter.color[2], fighter.color[3])
-    love.graphics.rectangle("fill", fighter.x - fighterWidth / 2, bodyTop,
+    local bodyShift = 0
+    if fighter.attack then
+        bodyShift = fighter.facing * (fighter.attack.phase == "active" and 4 or -2)
+    elseif fighter.recovery > 0 then
+        bodyShift = -fighter.facing * 2
+    end
+
+    if fighter.hitFlash > 0 then
+        love.graphics.setColor(1, 1, 1)
+    else
+        love.graphics.setColor(fighter.color[1], fighter.color[2], fighter.color[3])
+    end
+    love.graphics.rectangle("fill", fighter.x - fighterWidth / 2 + bodyShift, bodyTop,
         fighterWidth, bodyHeight)
-    love.graphics.circle("fill", fighter.x, bodyTop - 11, 12)
+    love.graphics.circle("fill", fighter.x + bodyShift, bodyTop - 11, 12)
+
+    if fighter.attack then
+        local reach = fighter.attack.phase == "active" and 24 or 10
+        local limbX = fighter.facing > 0
+            and fighter.x + fighterWidth / 2 - 2
+            or fighter.x - fighterWidth / 2 - reach + 2
+        love.graphics.rectangle("fill",
+            limbX,
+            fighter.y - (fighter.attack.kind == "kick" and 24 or 48),
+            reach, 8)
+    end
 
     if fighter.blocking then
         love.graphics.setColor(0.55, 0.88, 1, 0.8)
@@ -463,7 +534,7 @@ local function drawFighter(fighter)
             bodyTop - 5, fighterWidth + 10, bodyHeight + 10)
     end
 
-    if fighter.attack then
+    if fighter.attack and fighter.attack.phase == "active" then
         local hitbox = fighter.attack.hitbox
         if fighter.attack.kind == "punch" then
             love.graphics.setColor(1, 0.86, 0.20, 0.45)
@@ -496,7 +567,8 @@ local function drawHealthBar(fighter, x, alignRight, label)
 
     local attackStatus = "READY"
     if fighter.attack then
-        attackStatus = string.upper(fighter.attack.kind) .. " ACTIVE"
+        attackStatus = string.upper(fighter.attack.kind) .. " "
+            .. string.upper(fighter.attack.phase)
     elseif fighter.recovery > 0 then
         attackStatus = "RECOVERY"
     elseif fighter.blocking then
@@ -533,6 +605,16 @@ function love.draw()
     love.graphics.setFont(uiFont)
     love.graphics.printf("ROUND " .. game.round .. "     F1 " .. game.score1
         .. " - " .. game.score2 .. " F2", 0, 34, arenaWidth, "center")
+
+    if fighter1.combo > 0 then
+        love.graphics.setColor(1, 0.86, 0.35)
+        love.graphics.print(fighter1.combo .. " HIT COMBO", 12, 128)
+    end
+    if fighter2.combo > 0 then
+        love.graphics.setColor(1, 0.86, 0.35)
+        love.graphics.printf(fighter2.combo .. " HIT COMBO", arenaWidth - 192,
+            128, 180, "right")
+    end
 
     if game.state == "round_over" or game.state == "match_over" then
         love.graphics.setColor(1, 0.82, 0.25)
