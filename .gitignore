@@ -1,6 +1,10 @@
 # LÖVE / Shadow Fighters
 *.love
 *.log
+love-*-macos.zip
+love-runtime/
+phone_controls.txt
+phone_controls_*
 .DS_Store
 Thumbs.db
 .vscode/

@@ -10,6 +10,16 @@ We're building this as a **2-person team**, so this guide is designed to make it
 
 Shadow Fighters currently has:
 
+* Animated character-selection screen
+* 4 fighters with unique health, speed, power, and jump stats
+* Long side-scrolling campaign stage with a flag goal
+* Multi-layer parallax scenery and level progress display
+* Smash-style dynamic camera zoom that keeps both fighters visible
+* Three cooldown-based special moves for each fighter
+* Working question blocks that release temporary Super Mushrooms
+* Solid and moving platforms, pits, spikes, and alternate routes
+* Six contested power-ups with distinct tactical effects
+* Three-life checkpoint respawns and a trailing-player comeback boost
 * 2D fighting
 * Player vs Player
 * CPU opponent
@@ -26,6 +36,8 @@ Shadow Fighters currently has:
 * KO and timeout detection
 * DRAW detection
 * Match restart
+* Rideable horse and boar with different speed and jump boosts
+* Animal personalities, reactions, and character-specific bonds
 * ~60 FPS on low-end hardware
 
 The game is still being developed.
@@ -85,9 +97,34 @@ love .
 
 The game window should open.
 
+Fight and ride across the scrolling Shadow Road. Reaching the red goal flag at
+the far end wins the entire game. The progress bar under the timer shows how
+close Player 1 is to the finish.
+
+Jump into a **? block** from below to release a moving Super Mushroom. Either
+fighter can collect it. For 14 seconds that fighter grows larger, gains longer
+attack reach, deals 35% more damage, takes 20% less damage, and immediately
+recovers 25 health. The red aura and HUD timer show who currently has the
+advantage.
+
+Other blocks contain shields, fireball power, speed boots, instant animal-bond
+charms, and lightning that briefly stuns the opponent. Their colors and letter
+icons identify them after they appear.
+
+Each player starts with three lives. Knockouts and falling into pits cost one
+life and respawn the fighter at the latest checkpoint with brief invulnerability.
+The player who is behind in lives or far behind in the race receives a modest
+speed and damage comeback bonus. Reaching the flag still wins immediately.
+
 ---
 
 # 🎮 Controls
+
+## Character Select
+
+Use **A / D** to browse fighters and **J**, **Enter**, or **Space** to confirm.
+In CPU mode, the opponent is selected randomly. Press **C** during a match to
+return to character select.
 
 ## Player 1
 
@@ -100,6 +137,10 @@ The game window should open.
 | J   | Punch         |
 | K   | Kick          |
 | L   | Block         |
+| E   | Mount/dismount nearby animal |
+| U   | Chain Hook special |
+| I   | Shadow Rush special |
+| O   | Soul Burst special |
 | R   | Restart match |
 
 ## Player 2
@@ -115,6 +156,23 @@ When CPU mode is disabled:
 | N   | Punch      |
 | M   | Kick       |
 | B   | Block      |
+| /   | Mount/dismount nearby animal |
+| 1   | Chain Hook special |
+| 2   | Shadow Rush special |
+| 3   | Soul Burst special |
+
+**Chain Hook** fires a hooked chain up to long range and pulls an opponent into
+striking distance. **Shadow Rush** is a fast damaging dash. **Soul Burst**
+creates a powerful close-range shockwave. Each move has its own cooldown shown
+under the health bars.
+
+The CPU will automatically mount an available nearby animal. The horse is
+faster, while the boar gives a smaller speed and jump boost.
+
+Unridden animals watch nearby fighters, approach characters they trust, flee
+from incoming mounts, and interact when they meet. Every fighter has a favored
+animal shown on the selection screen. Riding that animal creates a **Perfect
+Bond**, adding extra movement, jump, and attack power.
 
 ---
 

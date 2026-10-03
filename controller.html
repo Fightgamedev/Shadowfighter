@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#12141a">
+  <title>シャドウファイターズ・コントローラー</title>
+  <style>
+    :root { --ink:#f5f0e6; --blue:#3b55ae; --hot:#dc4b3f; }
+    * { box-sizing:border-box; -webkit-user-select:none; user-select:none; touch-action:none; -webkit-tap-highlight-color:transparent; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#090a0d; color:var(--ink); font-family:system-ui,-apple-system,sans-serif; }
+    body { display:flex; justify-content:center; background:radial-gradient(circle at 50% 20%,#373b47 0,#111319 55%,#050609 100%); }
+    .shell { position:relative; width:min(100vw,520px); height:100dvh; min-height:620px; overflow:hidden; padding:max(12px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom)); background:linear-gradient(155deg,#353943 0,#1b1e25 46%,#111318 100%); box-shadow:0 0 70px #000; }
+    .shell:before { content:""; position:absolute; inset:7px; border:2px solid #555a66; border-radius:34px; pointer-events:none; box-shadow:inset 0 0 0 3px #111,inset 0 0 40px #0009; }
+    header { position:relative; z-index:1; height:84px; display:grid; grid-template-columns:1fr auto; align-items:start; gap:10px; padding:8px 12px; }
+    .brand { font-weight:900; font-style:italic; letter-spacing:.08em; font-size:clamp(17px,5vw,25px); line-height:1; text-shadow:2px 2px #000; }
+    .brand small { display:block; margin-top:7px; color:#9da6bc; font-size:9px; letter-spacing:.28em; font-style:normal; }
+    select { color:white; background:#101218; border:1px solid #727888; border-radius:7px; padding:8px 9px; font-weight:800; font-size:13px; box-shadow:inset 0 2px 6px #000; }
+    #status { position:absolute; top:62px; right:14px; color:#6dff9c; font-size:10px; letter-spacing:.08em; }
+    .screen { position:relative; margin:0 12px; height:48px; border:2px solid #08090b; border-radius:9px; background:linear-gradient(#090d16,#17243b); box-shadow:inset 0 0 16px #000,0 2px #4d515b; display:flex; align-items:center; justify-content:center; color:#82bfff; font-size:12px; letter-spacing:.15em; }
+    .controls { position:relative; height:calc(100% - 194px); min-height:400px; margin-top:12px; }
+    .joystick-zone { position:absolute; left:4%; top:8%; width:48%; aspect-ratio:1; display:grid; place-items:center; }
+    .stick-base { position:relative; width:88%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 42% 38%,#343943 0 25%,#15171c 64%,#050607 70%); box-shadow:inset 0 0 0 5px #08090b,inset 0 0 0 8px #555a64,0 12px 20px #000a; }
+    .stick-base:before,.stick-base:after { content:""; position:absolute; background:#0d0f13; opacity:.9; }
+    .stick-base:before { width:36%; height:100%; left:32%; } .stick-base:after { height:36%; width:100%; top:32%; }
+    .stick-knob { position:absolute; z-index:3; left:50%; top:50%; width:43%; aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle at 35% 28%,#646a75,#292d35 42%,#0b0c10 75%); border:3px solid #08090b; box-shadow:inset 0 0 0 3px #4b505b,0 8px 14px #000c; transition:transform .04s linear; }
+    .stick-label { position:absolute; bottom:-22px; width:100%; text-align:center; color:#8f95a3; font-size:10px; letter-spacing:.18em; }
+    .button-cluster { position:absolute; right:1%; top:4%; width:49%; height:52%; transform:rotate(-8deg); }
+    button { position:absolute; border:0; color:#fff; font-weight:900; font-family:inherit; text-shadow:0 2px 2px #0008; }
+    .face { width:30%; aspect-ratio:1; border-radius:50%; font-size:clamp(15px,5vw,24px); background:radial-gradient(circle at 36% 27%,#ff8076,var(--hot) 43%,#74231e 72%); border:3px solid #0b0c0f; box-shadow:inset 0 0 0 2px #ff978b88,0 7px 10px #000a; }
+    .face.special { background:radial-gradient(circle at 36% 27%,#7890e7,var(--blue) 43%,#1b296e 72%); box-shadow:inset 0 0 0 2px #9bafff88,0 7px 10px #000a; }
+    .face.on { transform:translateY(4px) scale(.94); filter:brightness(1.35); box-shadow:inset 0 0 12px #000a,0 2px 5px #000; }
+    .x {left:4%;top:1%}.y {left:36%;top:8%}.z {left:68%;top:19%}.a {left:0;top:47%}.b {left:32%;top:55%}.c {left:64%;top:66%}
+    .face span { display:block; font-size:8px; font-weight:700; opacity:.78; margin-top:1px; }
+    .system { position:absolute; left:11%; right:11%; bottom:2%; height:33%; }
+    .shoulder { top:0; width:42%; height:48px; border-radius:24px; background:linear-gradient(#777d89,#2a2e36 40%,#101217); border:2px solid #08090b; box-shadow:inset 0 1px #aab0ba,0 6px 9px #000a; font-size:12px; letter-spacing:.08em; }
+    .shoulder.on,.pill.on { transform:translateY(3px); filter:brightness(1.35); }
+    .mount {left:0}.block {right:0}
+    .pill { bottom:0; width:38%; height:42px; border-radius:22px; background:linear-gradient(#555b68,#23262d); border:2px solid #090a0d; box-shadow:inset 0 1px #9399a4,0 5px 8px #000b; font-size:12px; }
+    .confirm {right:0;background:linear-gradient(#5b72c7,#29366f)} .pause {left:0}
+    .hint { position:absolute; left:0; right:0; bottom:-17px; text-align:center; color:#838996; font-size:9px; letter-spacing:.11em; }
+    @media (max-height:700px) { .screen{height:38px}.controls{height:calc(100% - 172px);margin-top:5px}.joystick-zone{top:3%;width:43%}.button-cluster{top:0;height:55%}.system{height:34%} }
+    @media (orientation:landscape) { .shell{width:100vw;max-width:none}.controls{height:calc(100% - 150px)}.joystick-zone{width:31%;left:7%;top:-2%}.button-cluster{width:34%;right:7%;top:-5%}.system{left:39%;right:39%;height:58%;bottom:0}.screen{display:none} }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header><div class="brand">SHADOW FIGHTERS<small>ARCADE CONTROL SYSTEM</small></div><select id="player"><option value="1">プレイヤー1</option><option value="2">プレイヤー2</option></select><div id="status">接続中…</div></header>
+  <div class="screen" id="display">左スティックで選択・移動</div>
+  <main class="controls">
+    <section class="joystick-zone" id="joystick"><div class="stick-base"><div class="stick-knob" id="knob"></div></div><div class="stick-label">ANALOG MOVEMENT</div></section>
+    <section class="button-cluster">
+      <button class="face special x" data-button="special1">X<span>フック</span></button><button class="face special y" data-button="special2">Y<span>突進</span></button><button class="face special z" data-button="special3">Z<span>衝撃波</span></button>
+      <button class="face a" data-button="punch">A<span>パンチ</span></button><button class="face b" data-button="kick">B<span>キック</span></button><button class="face c" data-button="jump">C<span>ジャンプ</span></button>
+    </section>
+    <section class="system"><button class="shoulder mount" data-button="mount">L　動物に乗る</button><button class="shoulder block" data-button="block">R　ガード</button><button class="pill pause" data-button="crouch">しゃがむ</button><button class="pill confirm" data-button="confirm">決定 / START</button><div class="hint">スマホは縦向きで使用してください</div></section>
+  </main>
+</div>
+<script>
+  const active=new Set(),status=document.querySelector('#status'),player=document.querySelector('#player'),display=document.querySelector('#display'),zone=document.querySelector('#joystick'),knob=document.querySelector('#knob');
+  let sending=false,stickPointer=null;const queue=[];const buzz=ms=>{if(navigator.vibrate)navigator.vibrate(ms)};
+  function send(){const state=JSON.stringify({player:player.value,buttons:[...active]});if(queue[queue.length-1]!==state)queue.push(state);drain()}
+  async function drain(){if(sending||!queue.length)return;sending=true;const state=queue.shift();try{await fetch('/input',{method:'POST',headers:{'Content-Type':'application/json'},body:state});status.textContent=`接続済み • P${JSON.parse(state).player}`}catch(_){status.textContent='再接続中…';queue.unshift(state);sending=false;setTimeout(drain,500);return}sending=false;drain()}
+  function setButton(name,on,element){const changed=on?!active.has(name):active.has(name);if(on)active.add(name);else active.delete(name);if(element)element.classList.toggle('on',on);if(changed&&on)buzz(18);if(changed)send()}
+  document.querySelectorAll('button[data-button]').forEach(button=>{const name=button.dataset.button;const down=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);setButton(name,true,button)};const up=e=>{e.preventDefault();setButton(name,false,button)};button.addEventListener('pointerdown',down);button.addEventListener('pointerup',up);button.addEventListener('pointercancel',up);button.addEventListener('lostpointercapture',up)});
+  function moveStick(e){const r=zone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy,max=r.width*.27,mag=Math.hypot(dx,dy);if(mag>max){dx=dx/mag*max;dy=dy/mag*max}knob.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;const dead=max*.28;setButton('left',dx<-dead);setButton('right',dx>dead);setButton('jump',dy<-dead);setButton('crouch',dy>dead);const labels=[];if(dx<-dead)labels.push('左');if(dx>dead)labels.push('右');if(dy<-dead)labels.push('ジャンプ');if(dy>dead)labels.push('しゃがむ');display.textContent=labels.length?labels.join(' + '):'左スティックで選択・移動'}
+  function releaseStick(){stickPointer=null;knob.style.transform='translate(-50%,-50%)';['left','right','jump','crouch'].forEach(name=>setButton(name,false));display.textContent='左スティックで選択・移動';send()}
+  zone.addEventListener('pointerdown',e=>{e.preventDefault();stickPointer=e.pointerId;zone.setPointerCapture?.(e.pointerId);buzz(12);moveStick(e)});zone.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)moveStick(e)});zone.addEventListener('pointerup',e=>{if(e.pointerId===stickPointer)releaseStick()});zone.addEventListener('pointercancel',releaseStick);zone.addEventListener('lostpointercapture',releaseStick);
+  player.addEventListener('change',()=>{active.clear();releaseStick();send()});setInterval(send,100);send();
+</script>
+</body>
+</html>
