@@ -5,6 +5,8 @@ love-*-macos.zip
 love-runtime/
 phone_controls.txt
 phone_controls_*
+controller_qr.png
+controller_url.txt
 .DS_Store
 Thumbs.db
 .vscode/
