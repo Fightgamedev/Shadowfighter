@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
@@ -40,6 +40,7 @@
     .confirm {right:0;background:linear-gradient(#5b72c7,#29366f)} .pause {left:0}
     .hint { position:absolute; left:0; right:0; bottom:-17px; text-align:center; color:#838996; font-size:9px; letter-spacing:.11em; }
     .rotate-message { display:none; }
+    .rotate-action { position:relative; display:block; width:auto; height:auto; margin:20px auto 0; padding:12px 20px; border:1px solid #7188e8; border-radius:10px; background:linear-gradient(#5269c2,#27366f); color:#fff; font-size:14px; font-weight:800; }
     @media (orientation:landscape) {
       body { justify-content:stretch; }
       .shell { width:100vw; max-width:none; min-height:0; height:100dvh; padding:env(safe-area-inset-top) max(18px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(18px,env(safe-area-inset-left)); }
@@ -94,10 +95,18 @@
     <section class="system"><button class="shoulder mount" data-button="mount">MOUNT</button><button class="shoulder block" data-button="block">BLOCK</button><button class="pill pause" data-button="crouch">CROUCH</button><button class="pill confirm" data-button="confirm">START</button><div class="hint">HOLD PHONE SIDEWAYS</div></section>
   </main>
 </div>
-<div class="rotate-message"><div><span class="phone">↻</span>Rotate your phone sideways<span>Use the controller in landscape orientation.</span></div></div>
+<div class="rotate-message"><div><span class="phone">↻</span>Rotate your phone sideways<span id="orientationHint">Use the controller in landscape orientation.</span><button class="rotate-action" id="landscapeButton" type="button">TRY LANDSCAPE MODE</button></div></div>
 <div class="super-alert" id="superAlert"></div>
 <script>
   const active=new Set(),status=document.querySelector('#status'),player=document.querySelector('#player'),display=document.querySelector('#display'),zone=document.querySelector('#joystick'),knob=document.querySelector('#knob'),superAlert=document.querySelector('#superAlert');
+  const landscapeButton=document.querySelector('#landscapeButton'),orientationHint=document.querySelector('#orientationHint');
+  landscapeButton.addEventListener('click',async()=>{
+    try{
+      if(!document.fullscreenElement)await document.documentElement.requestFullscreen();
+      if(screen.orientation?.lock)await screen.orientation.lock('landscape');
+      else orientationHint.textContent='Your browser cannot rotate automatically. Turn your phone sideways.';
+    }catch(_){orientationHint.textContent='Turn your phone sideways to use the landscape controller.'}
+  });
   let sending=false,stickPointer=null,alertTimer;const queue=[];const buzz=ms=>{if(navigator.vibrate)navigator.vibrate(ms)};
   function send(){const state=JSON.stringify({player:player.value,buttons:[...active]});if(queue[queue.length-1]!==state)queue.push(state);drain()}
   async function drain(){if(sending||!queue.length)return;sending=true;const state=queue.shift();try{await fetch('/input',{method:'POST',headers:{'Content-Type':'application/json'},body:state});status.textContent=`CONNECTED • P${JSON.parse(state).player}`}catch(_){status.textContent='RECONNECTING…';queue.unshift(state);sending=false;setTimeout(drain,500);return}sending=false;drain()}

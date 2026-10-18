@@ -37,7 +37,9 @@ local resultFont = love.graphics.newFont(38)
 local titleFont = love.graphics.newFont(46)
 local characterFont = love.graphics.newFont(24)
 local controllerQrImage
-local controllerQrChecked = false
+local controllerQrCheckTimer = 0
+local controllerQrFileData
+local controllerQrUrl = "Start controller_server.py"
 
 local characters = {
     {
@@ -962,6 +964,33 @@ local previousPhoneEvents = { {}, {} }
 local phoneEventsInitialized = false
 local phoneConnected = { false, false }
 
+local function refreshControllerQr(force)
+    controllerQrCheckTimer = 0.5
+    local url = love.filesystem.read("controller_url.txt")
+    if url then
+        controllerQrUrl = url:gsub("%s+$", "")
+    end
+    local info = love.filesystem.getInfo("controller_qr.png")
+    if not info then
+        return
+    end
+
+    local data = love.filesystem.read("controller_qr.png")
+    if not data or (not force and data == controllerQrFileData) then
+        return
+    end
+    local ok, fileData = pcall(love.filesystem.newFileData, data, "controller_qr.png")
+    if not ok then
+        return
+    end
+    local imageOk, image = pcall(love.graphics.newImage, fileData)
+    if imageOk then
+        image:setFilter("nearest", "nearest")
+        controllerQrImage = image
+        controllerQrFileData = data
+    end
+end
+
 local function readPhoneState()
     local contents = love.filesystem.read("phone_controls.txt")
     local values = {}
@@ -1323,6 +1352,10 @@ local function updateCpu(dt)
 end
 
 function love.keypressed(key, scancode, isrepeat)
+    if key == "f11" and not isrepeat then
+        love.window.setFullscreen(not love.window.getFullscreen(), "desktop")
+        return
+    end
     if game.state == "character_select" then
         if key == "escape" then
             love.event.quit()
@@ -1413,6 +1446,7 @@ end
 
 function love.update(dt)
     menuPulse = menuPulse + dt
+    controllerQrCheckTimer = controllerQrCheckTimer - dt
     screenShakeTimer = math.max(0, screenShakeTimer - dt)
     screenFlashTimer = math.max(0, screenFlashTimer - dt)
     superBannerTimer = math.max(0, superBannerTimer - dt)
@@ -1528,6 +1562,155 @@ function love.update(dt)
     end
 end
 
+local function drawEmberFighter(fighter, scale, bodyShift)
+    local crouchScale = fighter.crouching and 0.88 or 1
+    love.graphics.push()
+    love.graphics.translate(fighter.x + bodyShift,
+        fighter.y - (fighter.mount and riderOffset or 0))
+    love.graphics.scale(fighter.facing * scale, scale * crouchScale)
+
+    local pulse = 0.5 + 0.5 * math.sin(menuPulse * 11 + fighter.x * 0.025)
+    local red = { 0.78 + pulse * 0.10, 0.075, 0.055 }
+    local bright = { 1.00, 0.28 + pulse * 0.20, 0.035 }
+    local dark = { 0.105, 0.055, 0.075 }
+    local skin = { 0.91, 0.53, 0.36 }
+    local attackReach = fighter.attack
+        and (fighter.attack.phase == "active" and 1 or 0.45) or 0
+
+    -- Long dark trousers and wrapped shin guards.
+    love.graphics.setColor(0.035, 0.028, 0.045)
+    love.graphics.polygon("fill", -11, -38, 1, -38, -4, -19, -18, -4,
+        -29, -4, -22, -18)
+    love.graphics.polygon("fill", 0, -38, 12, -39, 19, -20, 29, -7,
+        18, -2, 7, -17)
+    love.graphics.setColor(0.38, 0.055, 0.045)
+    love.graphics.polygon("fill", -23, -19, -17, -15, -25, -6, -30, -6)
+    love.graphics.polygon("fill", 16, -18, 22, -20, 30, -8, 24, -5)
+    love.graphics.setColor(0.075, 0.045, 0.055)
+    love.graphics.polygon("fill", -29, -5, -17, -5, -14, -1, -34, -1)
+    love.graphics.polygon("fill", 20, -5, 32, -7, 37, -2, 20, -1)
+    love.graphics.setColor(bright)
+    love.graphics.line(-24, -17, -19, -12, -26, -7)
+    love.graphics.line(17, -17, 23, -13, 29, -8)
+    love.graphics.setColor(0.16, 0.035, 0.045)
+    love.graphics.line(-18, -34, -11, -27, -17, -19)
+    love.graphics.line(3, -35, 10, -27, 14, -20)
+    love.graphics.setColor(0.70, 0.10, 0.055)
+    love.graphics.line(-17, -31, -13, -27)
+    love.graphics.line(4, -32, 9, -27)
+    love.graphics.setColor(1, 0.72, 0.25)
+    love.graphics.line(-31, -3, -21, -3)
+    love.graphics.line(23, -4, 34, -4)
+
+    -- A loose flame sash trails behind the fighter and follows the idle motion.
+    local clothWave = math.sin(menuPulse * 5 + fighter.x * 0.03) * 4
+    love.graphics.setColor(0.43, 0.025, 0.035, 0.96)
+    love.graphics.polygon("fill", -8, -42, -18, -39, -37, -48 + clothWave,
+        -31, -35 + clothWave, -47, -25 + clothWave, -23, -29, -9, -34)
+    love.graphics.setColor(bright[1], bright[2], bright[3], 0.94)
+    love.graphics.polygon("fill", -18, -40, -34, -45 + clothWave,
+        -28, -35 + clothWave, -42, -27 + clothWave, -22, -31)
+
+    -- Fitted red-and-black top, edged with gold piping.
+    love.graphics.setColor(dark)
+    love.graphics.polygon("fill", -12, -69, 8, -69, 15, -59, 10, -38,
+        -10, -38, -16, -57)
+    love.graphics.setColor(red)
+    love.graphics.polygon("fill", -10, -66, 6, -66, 10, -57, 6, -43,
+        -8, -43, -13, -57)
+    love.graphics.setColor(1, 0.63, 0.18)
+    love.graphics.line(-10, -64, -4, -57, 3, -64, 8, -58)
+    love.graphics.line(-8, -43, 7, -43)
+    love.graphics.setColor(0.14, 0.055, 0.045)
+    love.graphics.rectangle("fill", -12, -40, 25, 5, 2, 2)
+    love.graphics.setColor(1, 0.68, 0.20)
+    love.graphics.rectangle("fill", -2, -40, 6, 5, 1, 1)
+    love.graphics.setColor(0.72, 0.045, 0.035)
+    love.graphics.polygon("fill", -10, -35, 8, -35, 26, -30,
+        13, -27, -3, -31, -18, -27)
+    love.graphics.setColor(1, 0.31, 0.035)
+    love.graphics.polygon("fill", -15, -31, -4, -28, -17, -23,
+        -30, -22, -20, -27)
+    love.graphics.setColor(1, 0.74, 0.23)
+    love.graphics.line(-9, -39, 1, -37, 10, -39)
+    love.graphics.circle("fill", 1, -37, 2)
+    love.graphics.setColor(0.97, 0.30, 0.12)
+    love.graphics.line(-11, -59, -5, -55, -10, -50)
+    love.graphics.line(8, -59, 3, -54, 8, -50)
+
+    -- Raised guard and forward striking arm, drawn as outlined segments.
+    love.graphics.setColor(0.075, 0.035, 0.045)
+    love.graphics.setLineWidth(12)
+    love.graphics.line(-9, -62, -20, -53, -17, -45)
+    love.graphics.line(9, -61, 18, -54, 24 + 19 * attackReach, -53)
+    love.graphics.setColor(skin)
+    love.graphics.setLineWidth(7)
+    love.graphics.line(-9, -62, -20, -53, -17, -45)
+    love.graphics.line(9, -61, 18, -54, 24 + 19 * attackReach, -53)
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(0.48, 0.045, 0.04)
+    love.graphics.circle("fill", -17, -44, 6)
+    love.graphics.circle("fill", 25 + 19 * attackReach, -53, 7)
+    love.graphics.setColor(1, 0.53, 0.16)
+    love.graphics.rectangle("fill", 13, -57, 8, 6, 2, 2)
+    love.graphics.rectangle("fill", -22, -48, 8, 6, 2, 2)
+    love.graphics.setColor(0.98, 0.67, 0.18)
+    love.graphics.line(14, -56, 20, -56)
+    love.graphics.line(-22, -47, -16, -47)
+    love.graphics.setColor(0.22, 0.045, 0.04)
+    love.graphics.circle("fill", 25 + 19 * attackReach, -53, 3)
+    love.graphics.circle("fill", -17, -44, 3)
+
+    -- Face, dark headband and the high, flame-shaped ponytail.
+    love.graphics.setColor(0.10, 0.025, 0.04)
+    love.graphics.polygon("fill", -8, -78, -18, -88, -32, -99,
+        -25, -88, -42, -94, -30, -83, -47, -86, -29, -76, -13, -70)
+    love.graphics.setColor(0.62, 0.035, 0.025)
+    love.graphics.polygon("fill", -17, -82, -31, -96, -26, -86,
+        -40, -91, -28, -82, -43, -82, -26, -76)
+    love.graphics.setColor(bright)
+    love.graphics.line(-25, -91, -31, -87, -39, -87)
+    love.graphics.line(-22, -84, -32, -80)
+    love.graphics.setColor(0.12, 0.035, 0.04)
+    love.graphics.polygon("fill", -10, -71, -17, -83, -12, -79,
+        -13, -91, -5, -83, 0, -94, 3, -82, 10, -88, 8, -77, 14, -70)
+    love.graphics.setColor(0.42, 0.025, 0.025)
+    love.graphics.polygon("fill", -12, -81, -20, -91, -9, -87,
+        -7, -98, 0, -87, 10, -93, 6, -81)
+    love.graphics.setColor(bright)
+    love.graphics.line(-18, -90, -10, -87, -7, -94)
+    love.graphics.line(-3, -85, 2, -91, 7, -87)
+    love.graphics.setColor(skin)
+    love.graphics.ellipse("fill", 1, -73, 10, 12)
+    love.graphics.setColor(0.12, 0.025, 0.035)
+    love.graphics.polygon("fill", -9, -77, -7, -84, 6, -83,
+        11, -77, 5, -80, -3, -79)
+    love.graphics.setColor(1, 0.83, 0.58)
+    love.graphics.line(1, -73, 5, -72)
+    love.graphics.setColor(0.20, 0.035, 0.045)
+    love.graphics.line(2, -76, 7, -76)
+    love.graphics.circle("fill", 5, -76, 1.2)
+    love.graphics.setColor(0.72, 0.26, 0.16)
+    love.graphics.line(10, -72, 12, -69)
+    love.graphics.setColor(0.20, 0.025, 0.035)
+    love.graphics.line(6, -68, 1, -66, -2, -67)
+    love.graphics.setColor(1, 0.67, 0.15)
+    love.graphics.rectangle("fill", -8, -81, 16, 3, 1, 1)
+    love.graphics.circle("fill", 8, -80, 2)
+
+    if fighter.fireTimer > 0 then
+        love.graphics.setColor(1, 0.25, 0.025, 0.75)
+        for i = 1, 3 do
+            local flameY = -26 - i * 17
+            local flameX = -8 - (i % 2) * 5
+            love.graphics.polygon("fill", flameX, flameY + 9,
+                flameX - 5, flameY, flameX - 3, flameY - 10 - pulse * 4,
+                flameX + 3, flameY - 2, flameX + 7, flameY + 8)
+        end
+    end
+    love.graphics.pop()
+end
+
 local function drawFighter(fighter)
     local scale = fighter.mushroomTimer > 0 and 1.35 or 1
     local bodyWidth = fighterWidth * scale
@@ -1584,10 +1767,14 @@ local function drawFighter(fighter)
     else
         love.graphics.setColor(fighter.color[1], fighter.color[2], fighter.color[3])
     end
-    love.graphics.rectangle("fill", fighter.x - bodyWidth / 2 + bodyShift, bodyTop,
-        bodyWidth, bodyHeight)
-    love.graphics.circle("fill", fighter.x + bodyShift,
-        bodyTop - 11 * scale, 12 * scale)
+    if fighter.character and fighter.character.name == "EMBER" then
+        drawEmberFighter(fighter, scale, bodyShift)
+    else
+        love.graphics.rectangle("fill", fighter.x - bodyWidth / 2 + bodyShift, bodyTop,
+            bodyWidth, bodyHeight)
+        love.graphics.circle("fill", fighter.x + bodyShift,
+            bodyTop - 11 * scale, 12 * scale)
+    end
 
     if fighter.attack then
         local settings = attacks[fighter.attack.kind]
@@ -1820,6 +2007,53 @@ local function drawCharacterPortrait(character, x, y, scale, selected)
         love.graphics.circle("fill", x, y, 70 * scale)
     end
 
+    if character.name == "EMBER" then
+        love.graphics.setColor(0.12, 0.025, 0.04)
+        love.graphics.polygon("fill", x - 8 * scale, y - 12 * scale,
+            x - 24 * scale, y - 39 * scale, x - 13 * scale, y - 33 * scale,
+            x - 7 * scale, y - 53 * scale, x + 1 * scale, y - 34 * scale,
+            x + 18 * scale, y - 45 * scale, x + 10 * scale, y - 25 * scale)
+        love.graphics.setColor(0.90, 0.14, 0.025)
+        love.graphics.polygon("fill", x - 14 * scale, y - 34 * scale,
+            x - 22 * scale, y - 48 * scale, x - 9 * scale, y - 42 * scale,
+            x - 3 * scale, y - 58 * scale, x + 2 * scale, y - 39 * scale)
+        love.graphics.setColor(0.08, 0.04, 0.06)
+        love.graphics.polygon("fill", x - 38 * scale, y + 60 * scale,
+            x - 28 * scale, y + 5 * scale, x - 15 * scale, y - 6 * scale,
+            x + 16 * scale, y - 6 * scale, x + 30 * scale, y + 8 * scale,
+            x + 40 * scale, y + 60 * scale)
+        love.graphics.setColor(0.78, 0.055, 0.035)
+        love.graphics.polygon("fill", x - 25 * scale, y + 17 * scale,
+            x - 21 * scale, y - 8 * scale, x - 12 * scale, y - 17 * scale,
+            x + 12 * scale, y - 17 * scale, x + 23 * scale, y - 5 * scale,
+            x + 28 * scale, y + 18 * scale, x + 10 * scale, y + 11 * scale,
+            x - 9 * scale, y + 11 * scale)
+        love.graphics.setColor(0.93, 0.54, 0.37)
+        love.graphics.ellipse("fill", x + 2 * scale, y - 25 * scale,
+            17 * scale, 22 * scale)
+        love.graphics.setColor(0.10, 0.025, 0.035)
+        love.graphics.polygon("fill", x - 15 * scale, y - 28 * scale,
+            x - 12 * scale, y - 46 * scale, x + 7 * scale, y - 48 * scale,
+            x + 20 * scale, y - 32 * scale, x + 10 * scale, y - 37 * scale,
+            x - 2 * scale, y - 35 * scale)
+        love.graphics.setColor(1, 0.74, 0.22)
+        love.graphics.rectangle("fill", x - 13 * scale, y - 39 * scale,
+            28 * scale, 4 * scale, 2 * scale, 2 * scale)
+        love.graphics.circle("fill", x + 15 * scale, y - 37 * scale, 3 * scale)
+        love.graphics.setColor(0.20, 0.025, 0.035)
+        love.graphics.line(x + 7 * scale, y - 26 * scale,
+            x + 14 * scale, y - 25 * scale)
+        love.graphics.setColor(1, 0.48, 0.12)
+        love.graphics.polygon("fill", x - 28 * scale, y + 17 * scale,
+            x - 8 * scale, y + 12 * scale, x + 12 * scale, y + 17 * scale,
+            x + 26 * scale, y + 30 * scale, x + 7 * scale, y + 25 * scale,
+            x - 11 * scale, y + 30 * scale, x - 31 * scale, y + 24 * scale)
+        love.graphics.setColor(1, 0.70, 0.20)
+        love.graphics.rectangle("fill", x - 4 * scale, y + 14 * scale,
+            8 * scale, 8 * scale, 2 * scale, 2 * scale)
+        return
+    end
+
     love.graphics.setColor(0.06, 0.07, 0.12)
     love.graphics.polygon("fill",
         x - 42 * scale, y + 58 * scale,
@@ -1871,14 +2105,17 @@ local function drawCharacterSelect()
     love.graphics.setColor(0.48, 0.78, 1)
     love.graphics.printf("SHADOW FIGHTERS  //  RIDE. STRIKE. SURVIVE.",
         0, 75, arenaWidth, "center")
+    love.graphics.setColor(0.58, 0.64, 0.78)
+    love.graphics.printf("F11  FULLSCREEN", 0, 91, arenaWidth, "center")
 
     local cardWidth = 202
     local cardGap = 18
     local startX = 49
     for i, character in ipairs(characters) do
         local x = startX + (i - 1) * (cardWidth + cardGap)
-        local selected = selectedCharacter[1] == i
-            or (not cpuEnabled and selectedCharacter[2] == i)
+        local p1Selected = selectedCharacter[1] == i
+        local p2Selected = not cpuEnabled and selectedCharacter[2] == i
+        local selected = p1Selected or p2Selected
         local y = selected and 108 or 116
         local cardHeight = selected and 334 or 318
 
@@ -1886,6 +2123,23 @@ local function drawCharacterSelect()
         love.graphics.rectangle("fill", x + 5, y + 7, cardWidth, cardHeight, 12, 12)
         love.graphics.setColor(0.075, 0.085, 0.15, 0.96)
         love.graphics.rectangle("fill", x, y, cardWidth, cardHeight, 12, 12)
+        if p1Selected or p2Selected then
+            love.graphics.setFont(uiFont)
+            if p1Selected then
+                love.graphics.setColor(0.16, 0.46, 0.78, 0.92)
+                love.graphics.rectangle("fill", x + 12, y + 13, 48, 20, 6, 6)
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.printf("P1", x + 12, y + 17, 48, "center")
+            end
+            if p2Selected then
+                love.graphics.setColor(0.68, 0.28, 0.18, 0.94)
+                love.graphics.rectangle("fill", x + (p1Selected and 66 or 12),
+                    y + 13, 48, 20, 6, 6)
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.printf("P2", x + (p1Selected and 66 or 12),
+                    y + 17, 48, "center")
+            end
+        end
         love.graphics.setColor(character.color[1], character.color[2],
             character.color[3], selected and 0.95 or 0.42)
         love.graphics.rectangle("line", x, y, cardWidth, cardHeight, 12, 12)
@@ -1918,42 +2172,43 @@ local function drawCharacterSelect()
 
     local current = characters[selectedCharacter[1]]
     love.graphics.setColor(0.04, 0.05, 0.09, 0.92)
-    love.graphics.rectangle("fill", 0, 464, arenaWidth, 76)
+    love.graphics.rectangle("fill", 0, 448, arenaWidth, 92)
     love.graphics.setColor(current.color)
-    love.graphics.rectangle("fill", 0, 464, arenaWidth, 2)
+    love.graphics.rectangle("fill", 0, 448, arenaWidth, 2)
     love.graphics.setFont(characterFont)
     love.graphics.setColor(current.accent)
-    love.graphics.print("P1  " .. current.name, 42, 478)
+    love.graphics.print("P1  " .. current.name, 28, 458)
     love.graphics.setFont(uiFont)
-    love.graphics.setColor(0.82, 0.86, 0.94)
-    love.graphics.print("A / D  SELECT", 285, 482)
-    love.graphics.print("J / ENTER  CONFIRM", 410, 482)
-    love.graphics.setColor(0.48, 0.54, 0.66)
-    love.graphics.print(cpuEnabled and "OPPONENT: CPU RANDOM"
-        or "P2: ARROWS + N TO CONFIRM", 650, 482)
     love.graphics.setColor(phoneConnected[1] and { 0.38, 1.00, 0.62 }
         or { 0.48, 0.52, 0.62 })
     love.graphics.print("P1 PHONE: " .. (phoneConnected[1] and "CONNECTED" or "WAITING"),
-        42, 503)
-    if not controllerQrChecked then
-        controllerQrChecked = true
-        local ok, image = pcall(love.graphics.newImage, "controller_qr.png")
-        if ok then controllerQrImage = image end
+        28, 511)
+    love.graphics.setColor(0.82, 0.86, 0.94)
+    love.graphics.print("A / D  SELECT", 228, 470)
+    love.graphics.print("J / ENTER  CONFIRM", 228, 490)
+    if controllerQrCheckTimer <= 0 then
+        refreshControllerQr(controllerQrImage == nil)
     end
     if controllerQrImage then
         love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(controllerQrImage, 570, 470, 0, 0.34, 0.34)
+        love.graphics.draw(controllerQrImage, 390, 454, 0, 0.50, 0.50)
         love.graphics.setFont(uiFont)
-        love.graphics.setColor(0.72, 0.86, 1)
-        love.graphics.printf("SCAN TO JOIN", 560, 523, 86, "center")
+        love.graphics.setColor(0.74, 0.82, 1)
+        love.graphics.print("PHONE CONTROLLER", 472, 459)
+        love.graphics.setColor(0.90, 0.94, 1)
+        love.graphics.print("SCAN TO JOIN", 472, 478)
+        love.graphics.setColor(0.62, 0.70, 0.85)
+        love.graphics.printf(controllerQrUrl, 472, 499, 210, "left")
     end
     love.graphics.setColor(phoneConnected[2] and { 0.38, 1.00, 0.62 }
         or { 0.48, 0.52, 0.62 })
     love.graphics.printf("P2 PHONE: " .. (phoneConnected[2] and "CONNECTED" or "WAITING")
-        .. (selectionReady[2] and "  •  READY" or ""), 674, 503, 244, "right")
+        .. (selectionReady[2] and "  •  READY" or ""), 700, 460, 230, "right")
+    love.graphics.setColor(0.48, 0.54, 0.66)
+    love.graphics.printf(cpuEnabled and "OPPONENT: CPU RANDOM"
+        or "P2: ARROWS + N TO CONFIRM", 700, 483, 230, "right")
     love.graphics.setColor(0.55, 0.60, 0.72)
-    love.graphics.printf("C returns here during a match  •  ESC quits",
-        0, 523, arenaWidth, "center")
+    love.graphics.printf("C MENU  •  ESC QUIT", 700, 508, 230, "right")
 end
 
 local function drawScrollingBackground()
@@ -2105,8 +2360,17 @@ local function powerStatus(fighter)
 end
 
 function love.draw()
+    local screenWidth, screenHeight = love.graphics.getDimensions()
+    local screenScale = math.min(screenWidth / arenaWidth, screenHeight / 540)
+    local offsetX = (screenWidth - arenaWidth * screenScale) / 2
+    local offsetY = (screenHeight - 540 * screenScale) / 2
+    love.graphics.clear(0.015, 0.02, 0.045)
+    love.graphics.push()
+    love.graphics.translate(offsetX, offsetY)
+    love.graphics.scale(screenScale, screenScale)
     if game.state == "character_select" then
         drawCharacterSelect()
+        love.graphics.pop()
         return
     end
     love.graphics.push()
@@ -2193,7 +2457,7 @@ function love.draw()
     love.graphics.printf("P1 " .. math.floor(progress * 100) .. "%  •  P2 "
         .. math.floor(progress2 * 100) .. "%",
         arenaWidth / 2 - 70, 65, 140, "center")
-    love.graphics.printf("MOVE / JUMP / CROUCH TO STEER WHILE FLYING  •  SUPER MOVES: U I O P",
+    love.graphics.printf("MOVE / JUMP / CROUCH TO STEER WHILE FLYING  •  SUPER: U I O P  •  F11 FULLSCREEN",
         0, 516, arenaWidth, "center")
     if fighter1.mount then
         love.graphics.setColor(fighter1.mount.bonded and { 1, 0.86, 0.28 }
@@ -2234,4 +2498,5 @@ function love.draw()
         love.graphics.setColor(0.72, 0.92, 1, math.min(1, superBannerTimer * 1.5))
         love.graphics.printf(superBannerText, 0, 174, arenaWidth, "center")
     end
+    love.graphics.pop()
 end

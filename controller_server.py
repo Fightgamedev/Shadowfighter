@@ -57,7 +57,12 @@ def write_controller_qr():
     (ROOT / "controller_url.txt").write_text(url + "\n", encoding="utf-8")
     try:
         import qrcode
-        code = qrcode.QRCode(version=None, box_size=5, border=3)
+        code = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=4,
+        )
         code.add_data(url)
         code.make(fit=True)
         code.make_image(fill_color="black", back_color="white").save(
